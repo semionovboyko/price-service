@@ -97,29 +97,13 @@ Los casos 2 y 4 son los que validan el desempate por prioridad, ya que en esos i
 
 ## Arquitectura
 
-El proyecto sigue **arquitectura hexagonal (puertos y adaptadores)**, con el dominio completamente libre de dependencias de framework:
+El proyecto sigue **arquitectura hexagonal (puertos y adaptadores)**, con el dominio completamente libre de dependencias de framework.
 
-```
-src/main/java/com/bcnc/priceservice/
-├── PriceServiceApplication.java
-├── domain/                              → núcleo de negocio, sin Spring ni JPA
-│   ├── model/Price.java                 → value object inmutable
-│   ├── port/in/                         → puertos de entrada (casos de uso)
-│   ├── port/out/                        → puertos de salida (persistencia)
-│   └── exception/PriceNotFoundException.java
-├── application/service/PriceService.java → orquesta el caso de uso
-└── infrastructure/
-    ├── adapter/in/web/                  → adaptador REST (driving adapter)
-    │   ├── PriceController.java
-    │   ├── dto/, mapper/, exception/
-    └── adapter/out/persistence/         → adaptador JPA/H2 (driven adapter)
-        ├── PriceEntity.java, PriceJpaRepository.java, PriceRepositoryAdapter.java
-        └── mapper/
-```
+El paquete `domain` contiene el núcleo de negocio: el modelo (`Price`, como value object inmutable), los puertos de entrada (`port/in`, que definen los casos de uso) y los puertos de salida (`port/out`, que definen el contrato de persistencia sin comprometerse a una tecnología concreta), además de las excepciones propias del dominio como `PriceNotFoundException`. Esta capa no importa nada de Spring ni de JPA: se compila y se testea de forma completamente aislada, sin necesidad de levantar contexto ni base de datos.
 
-- **`domain`** no importa nada de Spring ni de JPA: se compila y se testea de forma completamente aislada.
-- **`application`** orquesta el caso de uso (`PriceService`), dependiendo solo de interfaces del dominio (inversión de dependencias, SOLID-D).
-- **`infrastructure`** contiene los adaptadores concretos: el adaptador web (entrada) y el adaptador de persistencia JPA/H2 (salida). Cada uno tiene su propio DTO/entidad y su propio mapper hacia/desde el modelo de dominio, para que un cambio en la tecnología de una capa no obligue a tocar el dominio.
+El paquete `application` contiene `PriceService`, que orquesta el caso de uso implementando el puerto de entrada correspondiente. Depende únicamente de interfaces del dominio, nunca de implementaciones concretas — es la inversión de dependencias de SOLID (el principio D) aplicada de forma directa: el dominio define el contrato, la infraestructura lo implementa, nunca al revés.
+
+El paquete `infrastructure` contiene los adaptadores concretos, divididos en dos direcciones. El adaptador de entrada (`adapter/in/web`) expone el caso de uso vía REST: `PriceController`, sus DTOs, su mapper hacia/desde el dominio y el manejo centralizado de errores. El adaptador de salida (`adapter/out/persistence`) implementa el puerto de persistencia contra JPA/H2: la entidad `PriceEntity`, el repositorio Spring Data (`PriceJpaRepository`) y el adaptador (`PriceRepositoryAdapter`) que traduce entre el mundo JPA y el modelo de dominio. Cada adaptador tiene su propio mapper, de forma que un cambio en la tecnología de una capa —por ejemplo, sustituir H2/JPA por MongoDB, o REST por un consumer de Kafka— no obliga a tocar el dominio ni el caso de uso.
 
 ### Decisiones de diseño relevantes
 
